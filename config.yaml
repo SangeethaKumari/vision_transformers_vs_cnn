@@ -1,0 +1,45 @@
+#-------------------------------------------------------------------------------------------
+#  Copyright (c) 2016-2025.  SupportVectors AI Lab
+#
+#  This code is part of the training material, and therefore part of the intellectual property.
+#  It may not be reused or shared without the explicit, written permission of SupportVectors.
+#
+#  Use is limited to the duration and purpose of the training at SupportVectors.
+#
+#  Author: SupportVectors AI Training
+#-------------------------------------------------------------------------------------------
+
+cohort: Spring 2025
+
+current_task: vit_classification # resnet_classification 
+
+tree-dataset:
+  path: /Users/chandarl/data/
+
+cnn:
+  results: /Users/chandarl/results/trees/cnn
+  model_name: microsoft/resnet-50
+
+vision-transformer:
+  results: /Users/chandarl/results/trees/vit
+  model_name: google/vit-base-patch16-224-in21k
+
+# Gunshot vs non-gunshot classification (LogMel spectrogram images)
+gunshot-dataset:
+  path: /Users/chandarl/data/gunshot/LogMel
+  processed_dir: /Users/chandarl/results/gunshot/processed
+  results_vit: /Users/chandarl/results/gunshot/vit
+  results_cnn: /Users/chandarl/results/gunshot/cnn
+  # Early stopping: stop when eval F1 >= this (set to null or omit to disable)
+  target_f1_score: 0.94
+
+
+# Family voice classification
+family-voice-dataset:
+  path: '/Users/sangeetha/Supportvector2026/llm/projects/labs/vision_transformers_vs_cnn/docs/data/processed/family_voice'       # The folder we just created
+  processed_dir: '/Users/sangeetha/Supportvector2026/llm/projects/labs/vision_transformers_vs_cnn/docs/data/processed/family_voice_cache'
+  results_vit: '/Users/sangeetha/Supportvector2026/llm/projects/labs/vision_transformers_vs_cnn/docs/results/family_voice_vit'
+  results_cnn: '/Users/sangeetha/Supportvector2026/llm/projects/labs/vision_transformers_vs_cnn/docs/results/family_voice_cnn'
+  target_f1_score: 0.95
+
+
