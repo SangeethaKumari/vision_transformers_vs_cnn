@@ -1,73 +1,82 @@
-# Vision Transformers vs CNN: Tree Classification
+# Vision Transformers vs CNN: Image & Audio Classification
 
 ## Overview
-This project contrasts a Vision Transformer (ViT) and a ResNet-50 CNN on a multi-class tree identification dataset. The `src/svlearn_vit_cnn/transfer_learning/trees_classification.py` script performs head-only transfer learning with Hugging Face Transformers, while `docs/notebooks/trees_classification.ipynb` collects qualitative and quantitative evaluations (predictions, ROC curves, timing, and metrics saved during training). The accompanying `evaluation_results.csv` extends the comparison to additional public datasets for quick reference.
+This repository explores the application of Vision Transformers (ViT) and CNNs (ResNet-50) across two distinct domains:
+1. **Tree Identification**: Multi-class classification of tree species from images.
+2. **Family Voice Identification**: Classification of family members ('mine', 'son', 'daughter') using LogMel spectrograms generated from audio recordings.
+
+The project demonstrates how the same underlying architectures (ViT and ResNet) can be applied to diverse data types once converted to a visual format.
 
 ## Repository Layout
-- `config.yaml` – toggles the experiment (`current_task`) and records dataset/model paths.
-- `src/svlearn_vit_cnn/transfer_learning/trees_classification.py` – main training loop shared by ViT and ResNet runs.
-- `src/svlearn_vit_cnn/utils/train_utils.py` & `dataset_tools/` – preprocessing, transforms, ROC plotting, and device helpers.
-- `docs/notebooks/trees_classification.ipynb` – post-training analysis notebook (requires trained checkpoints).
-- `evaluation_results.csv` – summary table of accuracy vs. inference speed across datasets.
+- `config.yaml` – Central configuration for task switching and dataset paths.
+- `src/svlearn_vit_cnn/transfer_learning/`
+    - `trees_classification.py` – Training script for the tree identification task.
+    - `audio_classification.py` – Training script for the family voice classification task.
+- `src/svlearn_vit_cnn/utils/` – Shared utilities for training, metrics, and visualization.
+- `docs/notebooks/`
+    - `trees_classification.ipynb` – Evaluation and inference for tree species.
+    - `family_voice_classification.ipynb` – Audio preprocessing and voice identification analysis.
+- `voice_classification_analysis.md` – Detailed breakdown of the audio pipeline, known gaps (e.g., multilingual support), and optimization tips.
 
 ## Environment Setup
-1. Install the uv virtual environment:
-   ```
+1. Install dependencies using `uv`:
+   ```bash
    uv sync
    ```
-   This pulls in `transformers[torch]`, `datasets`, `evaluate`, and the `svlearn-bootcamp` helpers referenced throughout the codebase.
+   This environment includes `transformers`, `torch`, `datasets`, and `librosa` (for audio processing).
 
-## Dataset Preparation
-1. Download the tree dataset (from the course portal) and arrange it as class-specific folders:
+---
+
+## 1. Tree Classification (Image Domain)
+
+### Dataset Preparation
+1. Download the tree dataset and arrange it as follows:
    ```
-   /Users/<you>/data/trees/
+   data/trees/
      ├── Oak/
      └── WeepingWillow/
+     ...
    ```
-2. Update `config.yaml`:
-   - `tree-dataset.path`: absolute path to the directory that contains the `trees` folder.
-   - `cnn.results` / `vision-transformer.results`: writable directories where checkpoints, metrics, and plots will be stored for each model.
-3. The preprocessing pipeline (`dataset_tools/preprocess.py`) automatically:
-   - Enumerates every image path under `trees/<class_name>`.
-   - Label-encodes classes, shuffles, and performs an 80/20 split.
-   - Writes `train.json` and `validation.json` into `preprocessed` directories when invoked from the training script.
+2. Update `tree-dataset.path` in `config.yaml`.
 
-## Training the Models
-The same training script handles both architectures; change `config['current_task']` to switch models.
-
-1. Open `config.yaml` and set:
-   - `current_task: vit_classification` for the ViT run (defaults to `google/vit-base-patch16-224-in21k`).
-   - `current_task: resnet_classification` for the ResNet-50 run (`microsoft/resnet-50`).
-2. Launch training:
-   ```
+### Training
+1. Set `current_task` in `config.yaml` to either `vit_classification` or `resnet_classification`.
+2. Run the training script:
+   ```bash
    uv run src/svlearn_vit_cnn/transfer_learning/trees_classification.py
    ```
-3. What the script does:
-   - Detects the best device via `get_device()` (CUDA, Apple Silicon/MPS, or CPU). Mixed precision (fp16/bf16) is enabled when available.
-   - Builds augmentation-heavy train transforms (random rotation, jitter, horizontal flip, resized crop) and deterministic eval transforms using the appropriate Hugging Face processor.
-   - Preprocesses the dataset, persists the fitted `LabelEncoder` as `label_encoder.joblib`, and wraps the Pandas splits with `datasets.Dataset`.
-   - Loads the chosen backbone, freezes all layers, unfreezes only `model.classifier`, and prints trainable parameter counts.
-   - Trains for up to 50 epochs with `TrainingArguments` (batch size 16, LR 2e-4, step-based eval/save cadence of 500, `load_best_model_at_end=True`).
-   - Saves artifacts under the configured `results` directory:
-     - `pytorch_model.bin`, tokenizer/processor config, and `trainer_state.json`.
-     - `train_results.json`, `eval_results.json`, and TensorBoard-friendly logs.
-     - `roc.png` generated from `compute_metrics`, plus confusion-metric JSON.
 
-**Tip:** Run the script twice (once per `current_task`). The evaluation notebook expects both result directories to exist and contain the saved label encoders and metrics.
+---
 
-## Evaluation Notebook (`docs/notebooks/trees_classification.ipynb`)
-1. Ensure both training passes completed; the notebook will load checkpoints from the directories defined in `config.yaml`.
-2. Open the notebook (VS Code, JupyterLab, or `uvx jupyter lab`). The first cell imports shared helpers via `%run supportvectors-common.ipynb`.
-3. Notebook capabilities:
-   - Loads both ViT and ResNet models in evaluation mode, including the saved `LabelEncoder` to convert logits back to class names.
-   - Demonstrates single-image inference on an unseen validation photo (provided path: `<tree-dataset.path>/test_oak_tree.webp`).
-   - Reads `eval_results.json` and `train_results.json` for each model to display accuracy, precision, recall, F1, and training-time metadata.
-   - Shows saved ROC curves (`roc.png`) from both experiments.
-   - Provides hooks for further qualitative inspection (e.g., overlay attention maps if you extend the notebook).
-4. Re-run cells after toggling `current_task` and retraining if you change hyperparameters or dataset composition.
+## 2. Family Voice Classification (Audio Domain)
+
+### Workflow: Audio to Spectrograms
+Instead of raw audio, this pipeline uses **LogMel Spectrograms**—visual representations of sound frequencies over time.
+
+1.  **Extraction**: Audio is extracted from family videos.
+2.  **Slicing**: Long audio is sliced into fixed-duration segments (e.g., 6 seconds).
+3.  **Visualization**: Segments are converted to `.png` spectrogram images using `librosa`.
+4.  **Organization**: Images are stored in class-specific folders (`mine/`, `son/`, `daughter/`).
+
+### Training
+1.  Configure the `family-voice-dataset` section in `config.yaml` with your image paths.
+2.  Set `current_task` (Vit or ResNet).
+3.  Launch the audio training script:
+    ```bash
+    uv run src/svlearn_vit_cnn/transfer_learning/audio_classification.py
+    ```
+
+**Note on Specialization**: The `audio_classification.py` script is optimized for this task by unfreezing the final encoder layer (Layer 11 for ViT) to learn the specific nuances of vocal cord characteristics.
+
+### Evaluation & Gaps
+The `voice_classification_analysis.md` file tracks critical findings, such as:
+*   **Duration Consistency**: Ensuring training and inference use the same audio segment length.
+*   **Linguistic Diversity**: The importance of training on multiple languages (e.g., English and Tamil) to ensure the model learns *who* is speaking rather than *what* is being said.
+
+---
 
 ## Metrics Snapshot
-`evaluation_results.csv` captures aggregate results (accuracy shown as a percentage; inference time as seconds per image):
+`evaluation_results.csv` captures baseline results across different experiments:
 
 | Dataset | Model | Accuracy (%) | Inference Time (s/image) |
 | --- | --- | --- | --- |
@@ -78,5 +87,5 @@ The same training script handles both architectures; change `config['current_tas
 | trees | ViT | 45.69 | 0.0018 |
 | trees | ResNet | 48.68 | 0.0025 |
 
-Use these as a baseline; rerunning training with different augmentations, deeper fine-tuning, or longer schedules will change the final numbers.
+*Note: Voice classification metrics are typically tracked directly in the `results/` folder via `eval_results.json`.*
 
